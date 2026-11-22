@@ -1,197 +1,254 @@
 ---
 name: port-to-openharmony
-description: Use this skill when porting or replicating an application onto OpenHarmony. Follow this pipeline in order: check or create the HAP shell, decide open-source vs closed-source, take the TS or native path, verify with a HAP, then add input, file access, and multi-device deployment.
+description: Use this skill when porting or replicating an application onto OpenHarmony. Follow the pipeline in order: reuse or create the HAP shell, choose an open-source or closed-source implementation path, integrate and verify with a signed HAP, then add input, file access, and multi-device deployment.
 ---
 
-# 将应用移植或复刻到 OpenHarmony / Port or replicate an app to OpenHarmony
+# 将应用移植或复刻到 OpenHarmony
 
-按下面的流水线**顺序执行，不要跳步**。前一步没有达到通过标准，就不要进入下一步。步骤是通用的，不要绑定某一个具体上游项目，也不要把某台开发机上的绝对路径写进命令或文档。
+本 Skill 给出一条可执行的通用流水线，用于把其他平台上的应用移植或复刻到 OpenHarmony。请按步骤顺序推进：前一步未达到进入标准，不要开始下一步。做法保持通用，不要绑定某一个上游项目，也不要在文档或脚本里写死某台开发机的绝对路径。
 
-Follow this pipeline **in order. Do not skip a step.** Do not start the next stage until the current one has met its pass criteria. Keep the steps generic: do not bind them to one upstream project, and do not hard-code absolute paths from one developer machine.
-
-本仓库持续更新中。配套检查清单：[checklists/pre-publication.md](../../checklists/pre-publication.md)。
-
-This playbook is continuously updated. Companion checklist: [checklists/pre-publication.md](../../checklists/pre-publication.md).
+本仓库持续更新中。分发或公开前请对照 [checklists/pre-publication.md](../../checklists/pre-publication.md)。官方说明以 [OpenHarmony 开发者文档](https://docs.openharmony.cn/) 当前版本为准，并使用与目标设备匹配的 SDK。
 
 ---
 
-## 流水线总览 / Pipeline overview
+## 流水线
 
-1. 判断 OpenHarmony 壳子是否已经创建成功；已创建则不再创建，未创建则先创建壳。
-2. 判断要移植或复刻的项目是开源还是闭源，并按语言选择路径。
-3. 编译并集成完毕后，用 NAPI 对接 so（原生路径），UI 用 XComponent 渲染，再编译成 HAP 做初步验证。
-4. 初步验证成功后，对接触控、鼠标等交互方式。
-5. 交互对接完毕后，再对接保存、选择，以及沙箱或公共目录等文件策略。
-6. 最后完成一次开发、多端部署。
+1. 确认或创建壳工程。
+2. 判断开源与否，并选择实现路径（闭源复刻，或按语言做 TypeScript / 原生移植）。
+3. 完成集成，打出已签名的 HAP，在设备上做「能装能跑」的初步验证。
+4. 对接触控、鼠标等输入。
+5. 对接保存、选择，并确定沙箱或公共目录策略。
+6. 在同一工程上完成一次开发、多端部署。
 
-1. Check whether an OpenHarmony shell already exists; reuse it if it does, and create one only if it does not.
-2. Decide whether the source is open-source or closed-source, then choose the language path.
-3. After the build and integration are done, wire NAPI to the `.so` (native path), render the UI with XComponent, and package a HAP for initial verification.
-4. After that verification succeeds, hook up touch, mouse, and other input.
-5. After input works, hook up save, file picking, and the sandbox versus public-directory policy.
-6. Finally, complete one codebase with multi-device deployment.
+开始前先记下目标设备形态、系统（OpenHarmony 或 HarmonyOS）以及 API 级别。这些假设会直接影响壳工程配置和签名方式。
 
 ---
 
-## 第 1 步：判断并准备 OpenHarmony 壳子 / Step 1. Check or create the OpenHarmony shell
+## 第 1 步：确认或创建壳工程
 
-**入口条件 / Entry：** 已确定要把一个已有应用移植或复刻到 OpenHarmony，并且已明确目标设备或 API 级别。
+**目的**
 
-**要做的判断：** 当前是否已经有可用的 OpenHarmony 壳子，也就是 DevEco 工程或 HAP 工程骨架（含应用/模块配置、可打包的 entry、能够对应到目标系统的 `runtimeOS` 与 SDK）。
+所有后续集成都落在同一个 DevEco / HAP 壳工程里，避免并行建两套工程把工作拆散。
 
-- **如果壳子已经创建成功：不再创建。** 复用现有工程，只核对它是否仍能编译、签名和安装。不要另起一套平行工程把工作拆散。
-- **如果还没有壳子：先创建壳。** 用 DevEco 或等价方式建立一个最小 HAP 工程骨架，配置好包名、`runtimeOS`、compileSdk / compatibleSdk、目标 ABI，并确保签名材料只留在本地、不进仓库。
+**做法**
 
-**产出物 / Deliverables：** 一个可打开的壳工程；一份简短记录，说明壳是复用的还是新建的，以及目标系统和 API 级别。
+1. 先检查当前工作区是否已经有可用的壳工程：能否打开，是否包含可打包的 entry 模块，以及 `runtimeOS`、compileSdk / compatibleSdk、包名和 ABI 是否已经填写。
+2. **若壳工程已经可用，直接复用，不要再建一套。** 只需核对它是否仍能编译，以及配置是否仍与目标设备一致。
+3. 若还没有壳工程，再创建最小骨架：包名、`runtimeOS`、SDK 与 ABI、本地签名配置。签名证书、密钥和 Profile 只放在本机，不要写入仓库。
+4. 打包和签名环境需要准备好官方 SDK、以及运行应用包签名工具所需的 Java 运行时。官方签名工具以 Java 或配套命令行方式调用，缺少 Java 时往往在出包阶段才暴露。
 
-**通过标准 / Pass criteria：** 壳工程存在且配置与目标设备一致。这一步还不必做出完整功能；但后面所有集成都落在这个壳里，而不是另外再建一个互不相干的工程。
+**检查项**
 
-If a usable shell already exists, do not create another one. If it does not, create a minimal HAP/DevEco skeleton first, and keep signing material local.
+- `runtimeOS`、SDK 和 API 级别与目标设备一致。面向 HarmonyOS 的工程不能默认拿到 OpenHarmony 设备上安装，反之亦然。
+- 签名类型与目标设备匹配。调试签名、厂商或企业设备管理策略、以及设备 API 低于包声明的情况，都可能导致安装失败。面向 OpenHarmony 设备分发时，应使用与该系统匹配的应用证书、已签名的 Provision Profile，并关注设备是否要求代码签名（codesign）。可参考官方 [应用包签名工具概述](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/security/hapsigntool-overview.md)：只有经过签名的应用才能在真机上安装、运行和调试；对无需跨级别申请 ACL 权限的应用，DevEco Studio 也提供自动化签名。
+- 配置写在工程文件或可替换的本地配置中，而不是某台机器的绝对路径。
 
----
+**常见失败与处理**
 
-## 第 2 步：判断开源与否，并按语言选择路径 / Step 2. Open-source or not, then choose the language path
+- 能编译但不能安装：优先核对 `runtimeOS`、API 级别、签名证书 / Profile 类型和包名冲突，而不是先改业务代码。
+- SDK 过旧或 API 声明高于设备能力：更换与设备匹配的 SDK，或降低声明并回归验证。
+- 签名工具报错或找不到 Java：先补齐工具链，再重新出包。
 
-**入口条件 / Entry：** 第 1 步的壳已经就绪（复用或新建完成）。
+**进入下一步的标准**
 
-先判断当前要移植或复刻的项目是**开源**还是**不是开源**。这里同时确认许可是否允许计划中的使用方式，以及品牌、图标、名义是否可沿用；许可或商标不允许时，应先改目标，而不是继续搬代码。
-
-First decide whether the project is **open-source** or **not**. Also confirm that the license allows the intended use, and that branding can be reused; if it cannot, change the goal before moving code.
-
-### 2.1 如果不是开源的 / If it is not open-source
-
-通过 **CraftAnything** 分析当前软件，然后用其他语言进行实现。
-
-CraftAnything 是本流程指定的闭源分析入口。请用它分析闭源软件的界面与行为，再选用合适的语言，在 OpenHarmony 上复刻实现。不要把闭源程序的内部实现原样拷进本工程。公开文档目前主要说明它可以研究已有软件并辅助做出新的实现；本 Skill 不编造更多产品细节，以你实际使用的版本为准。公开入口见 [Craft Anything](https://craftanything.lol/) 与 [storytold/craft-anything](https://github.com/storytold/craft-anything)。
-
-选定实现语言之后：
-
-- 若决定用 TypeScript / ArkTS 在壳里复刻，进入下面的 **TS 移植路径**（2.2.1），把复刻代码落到第 1 步的壳中。
-- 若决定用 C / C++ / Rust 等实现核心，进入 **原生路径**（2.2.2），用官方工具链编出 so，再集成到壳中。
-
-**产出物 / Deliverables：** 对闭源软件界面与行为的分析结论；选定的实现语言；开始落到壳工程中的复刻代码或原生核心。
-
-**通过标准 / Pass criteria：** 已经明确「这是复刻而不是搬源码」，实现语言已选定，并且后续工作有明确的 TS 或原生分支可走。
-
-Use CraftAnything as the closed-source analysis entry: analyze the app's UI and behavior, then reimplement it on OpenHarmony in a suitable language. Do not copy the closed-source internals into the project.
-
-### 2.2 如果是开源的 / If it is open-source
-
-查看当前代码是用什么语言写的，再选路径。保留上游要求的版权、许可和 NOTICE。
-
-Inspect the source language, then choose a path. Keep the copyright, license, and NOTICE files required by upstream.
-
-#### 2.2.1 TS 且与 OpenHarmony 兼容：按 TS 移植方案进行 / TypeScript compatible with OpenHarmony
-
-**兼容性判断（必须先做）：**
-
-- **语法：** ArkTS 以 TypeScript 为基础，但并不支持全部 TS 特性。先确认源码能否迁到 ArkTS，或需要改写哪些语法。
-- **依赖：** Node.js、浏览器 DOM、React / Vue 等运行时，以及普通 npm 包，都不能默认当作 OpenHarmony 可用。要逐个核对是否有 ArkTS / OpenHarmony 可替换实现。
-- **UI 与系统 API：** 界面需要落到 ArkUI；文件、网络、权限等要换成 OpenHarmony 能力。只是「文件扩展名是 `.ts`」并不等于可以直接运行。
-
-若判断为**兼容，或经过有限改写后可兼容**：按照 TS 移植到 OpenHarmony 的方案，把代码迁进第 1 步的壳工程：
-
-1. 把源码调整为 ArkTS 可编译的写法，去掉不兼容语法。
-2. 用 ArkUI 替换原来的 UI 框架。
-3. 用 OpenHarmony 系统能力替换 Node / 浏览器 / 其它平台 API。
-4. 在壳工程里完成模块划分和编译配置，准备打 HAP。
-
-若判断为**不兼容**：不要强行把原 TS 工程塞进 HAP。应改为在壳里用 ArkTS 复刻关键能力，或把必须保留的重逻辑改走原生路径，而不是假设原有 TS 运行时可以原样启动。
-
-**产出物 / Deliverables：** 兼容性结论；已迁入或已改写到壳工程中的 ArkTS 代码。
-
-**通过标准 / Pass criteria：** 壳工程能够编译这些 TS / ArkTS 代码，且主界面或主模块已经落在该壳中，可以进入第 3 步的 HAP 验证。
-
-If the TypeScript is compatible with ArkTS/ArkUI (or can be made compatible with limited changes), port it into the shell. If it is not, do not force the original TS runtime into the HAP.
-
-#### 2.2.2 C / C++ / Rust 等：官方工具链编译成 so，再集成 / C, C++, Rust, and similar
-
-通过 OpenHarmony 的**官方编译工具链**进行交叉编译，编译成 `.so`，然后再集成到第 1 步的壳工程中。
-
-1. 使用与目标设备匹配的官方 SDK / 工具链和 sysroot，不要把 OpenHarmony 目标当成普通 Linux，以免误拉 GTK、X11 等桌面依赖。
-2. 先得到能被 HAP 加载的共享库（一个或多个 `.so`）。
-3. 把 so 集成到已有或新建的壳工程中（放到模块约定的 native 库位置，并写好打包配置）。
-
-**产出物 / Deliverables：** 官方工具链编出的 so；已写入壳工程的集成配置。
-
-**通过标准 / Pass criteria：** so 已由官方工具链生成，并且已经进入壳工程，可以进入第 3 步用 NAPI 和 XComponent 对接。
-
-Cross-compile with the official OpenHarmony toolchain into `.so` files, then integrate them into the shell. Do not treat the OpenHarmony target as ordinary Linux.
-
-若开源项目是其它语言（既不是可兼容的 TS，也不是 C / C++ / Rust 一类可直接编 so 的语言），先判断能否改写到 TS 路径或原生路径；不能时，按复刻方式在壳里重新实现，不要跳过第 3 步的 HAP 验证。
+壳工程已经确定（复用或新建完成），配置与目标系统一致，并且签名材料可在本地使用。这一步还不必做出完整功能。
 
 ---
 
-## 第 3 步：NAPI / XComponent 对接，并编译 HAP 做初步验证 / Step 3. Wire NAPI and XComponent, then verify with a HAP
+## 第 2 步：判断开源与否，并选择实现路径
 
-**入口条件 / Entry：** 第 2 步的编译和集成已经完成。也就是说：TS 路径的代码已落入壳工程并可编译；或原生路径的 so 已编出并已集成到壳中。
+**目的**
 
-按路径完成对接，然后**编译成 HAP 进行验证**：
+先分清「移植已有源码」还是「按行为复刻」，再按技术栈选择实现方式，避免在错误前提上投入大量改造。
 
-- **原生路径：** 通过 Native 创建 NAPI，对接已集成的 so；UI 用 XComponent 去渲染。不要在这一步开始做完整的手势或文件管理，先让核心画面或主处理结果能在设备上出现。
-- **TS 路径：** 界面用 ArkUI 渲染。若这一阶段没有 so，则不必强行补一条空的 NAPI / XComponent 链路；直接在壳里编译 HAP 做验证。
+**做法**
 
-**产出物 / Deliverables：** 已对接的工程（原生路径含 NAPI 与 XComponent）；一份可安装的 HAP。
+1. 判断源项目是否开源，并阅读其许可证：是否允许修改、分发以及计划中的使用方式。若包含多种许可，按目录确认适用范围，并保留版权、LICENSE 和 NOTICE。
+2. 把代码许可和品牌资源分开看。图标、启动图、字体和产品名称往往并不随代码一并授权。派生应用在未获得授权时，应使用自己的名称和图标。
+3. 按下面的分支继续。
 
-**通过标准 / Pass criteria：** HAP 能在目标设备上**安装并启动**，并且能看到主路径的初步结果（例如核心界面出现，或原生渲染表面已经出来）。**只有 HAP 能装能跑，才能进入第 4 步的交互对接。** 能编过但装不上、或能装上却立即退出，都不算通过。
+### 2.1 闭源项目：先分析行为，再在 OpenHarmony 上复刻
 
-For the native path, create NAPI bindings to the `.so` and render with XComponent, then package a HAP. For the TS path, build the HAP from the ArkTS/ArkUI shell. The pass criterion is the same: the HAP must install and run on the target device before input work starts.
+闭源软件没有可分发的源码，不能把原程序的实现拷进工程。本流程以 **CraftAnything** 作为分析入口：用它观察并记录目标软件的界面结构、交互路径和可感知行为，再选用合适的语言，在壳工程中重新实现。公开介绍见 [Craft Anything](https://craftanything.lol/) 与 [storytold/craft-anything](https://github.com/storytold/craft-anything)。
 
----
+分析结论应能回答：主路径是什么、关键界面有哪些状态、输入和输出是什么。然后再选择实现语言：
 
-## 第 4 步：对接触控、鼠标等交互方式 / Step 4. Hook up touch, mouse, and other input
+- 适合用 ArkTS / TypeScript 表达的界面和业务，走第 2.2.1 节。
+- 需要保留或重写为 C / C++ / Rust 等原生核心的能力，走第 2.2.2 节。
 
-**入口条件 / Entry：** 第 3 步已经初步验证成功，HAP 能装能跑。
+### 2.2 开源项目：先判断技术栈，再选择移植方式
 
-现在才对接触控、鼠标等交互方式。把点击、滑动、滚轮、悬停或指针等事件接到 ArkUI 或 XComponent 的输入回调上，并处理系统返回。先保证主路径上的基本操作可用，再考虑多点触控或压感。
+#### 2.2.1 TypeScript / ArkTS 路径
 
-**产出物 / Deliverables：** 主路径上可用的触控和（如需要）鼠标交互。
+先做兼容性判断，再迁移，不要假设「源码是 `.ts`」就可以直接运行：
 
-**通过标准 / Pass criteria：** 在设备上可以用触控完成主路径中的基本操作；若目标形态包含鼠标或指针，对应操作同样可用。交互还不通时，不要进入文件保存和目录策略。
+- **语法：** ArkTS 以 TypeScript 为基础，但并不覆盖全部 TypeScript 特性。列出必须改写的语法。
+- **依赖：** Node.js、浏览器 DOM、以及常见前端框架和普通 npm 包，都不能默认视为可用。逐个确认是否有 ArkTS 或 OpenHarmony 可替换实现。
+- **UI 与系统能力：** 界面迁到 ArkUI；文件、网络、权限等改为 OpenHarmony API。
 
-Only after the HAP installs and runs, hook up touch, mouse, and other input. Do not start file-access work until this input path works.
+若判断为兼容，或只需有限改写即可兼容：把源码调整为可编译的 ArkTS，用 ArkUI 替换原 UI 框架，用系统能力替换原平台 API，并纳入壳工程编译。
 
----
+若判断为不兼容：在壳工程中用 ArkTS 复刻主路径，或把必须保留的重计算改走原生路径，不要把原来的 TypeScript 运行时硬塞进 HAP。
 
-## 第 5 步：对接保存、选择与目录策略 / Step 5. Hook up save, picking, and directory policy
+#### 2.2.2 C / C++ / Rust 等原生路径
 
-**入口条件 / Entry：** 第 4 步的交互方式已经对接完毕，主路径基本操作可用。
+使用 OpenHarmony **官方编译工具链**进行交叉编译，生成可被 HAP 加载的 `.so`，再集成到第 1 步的壳工程中。官方 NDK 工程通常以 CMake 构建，并通过 `ohos.toolchain.cmake` 指定 `OHOS_PLATFORM`、`OHOS_ARCH`（例如 `arm64-v8a`）等参数，详见 [使用命令行 CMake 构建 NDK 工程 / NDK 工程构建概述](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/napi/build-with-ndk-overview.md)。
 
-在交互可用之后，再对接保存、选择等能力，并明确文件走**应用沙箱**还是**公共目录**：
+特别注意：部分构建系统或语言生态仍可能把 OpenHarmony 目标识别为普通 Linux，从而拉取 GTK、fontconfig、winit 等桌面依赖。应显式切换到 ohos 目标，关闭不适用的桌面后端，并使用与 SDK 配套的 sysroot，而不是主机上的 GNU/Linux 或 Android 库。
 
-- 保存、另存为、打开与选择文件，应通过系统文件选择或应用可见的目录来完成，而不是假设拥有整机文件系统。
-- 默认优先使用应用沙箱。只有产品确实需要访问公共目录时，再申请对应权限，并处理用户拒绝后的路径。
-- 在文档中写清本阶段支持的文件来源和权限范围。
+集成时优先做**最小闭环**：先把一个最小的 NAPI 动态库（例如只导出初始化、处理、销毁）链入壳工程已有的 native 入口（如 `libentry`），确认可以加载，再逐步扩大接口。不要一开始就重写全部界面。
 
-**产出物 / Deliverables：** 保存与选择流程；关于沙箱或公共目录的明确策略。
+若开源项目既不是可兼容的 TypeScript，也不能直接编成 so，先判断能否改写到上述两条路径之一；不能时，按复刻方式在壳工程中实现主路径。
 
-**通过标准 / Pass criteria：** 用户能在设备上完成一次符合策略的保存或选择，并且权限不足时有可理解的失败路径。
+**检查项**
 
-After input works, add save and file picking, and decide whether files live in the app sandbox or a public directory. Prefer the sandbox unless the product truly needs public storage, and request only the permissions that path requires.
+- 许可和品牌结论已经写明，派生应用的命名与图标不误用未授权资源。
+- 闭源路径有界面与行为分析，而不是猜测实现细节。
+- TypeScript 路径有兼容性结论；原生路径已使用官方工具链，且未误开桌面后端。
+- 产物已经进入同一个壳工程。
 
----
+**常见失败与处理**
 
-## 第 6 步：一次开发，多端部署 / Step 6. One development effort, multi-device deployment
+- 许可证不允许计划中的分发方式：停止搬代码，先调整目标。
+- 交叉编译突然出现 GTK / X11 一类依赖：回到目标检测和条件编译，确认 ohos 目标生效。
+- so 能编出但壳工程打包时找不到：检查 ABI、库文件位置和模块打包配置。
 
-**入口条件 / Entry：** 第 5 步已完成，主路径在交互和文件访问上已经打通。
+**进入下一步的标准**
 
-最后再完成一次开发、多端部署。也就是：仍维护同一套壳工程和核心实现，针对手机、平板等不同设备形态做适配与打包，而不是为每个端再从头做一套移植。
-
-1. 核对不同设备的 `runtimeOS`、API 级别、屏幕与输入形态（触控为主或触控加指针）。
-2. 在同一代码库里用布局、资源或条件编译适配多端，而不是复制出互不相通的工程。
-3. 在计划支持的每类设备上安装 HAP，回归主路径：启动、交互、保存或选择。
-4. 对外分发或开源前，执行 [checklists/pre-publication.md](../../checklists/pre-publication.md)，确保没有密钥、签名材料、内部路径和设备信息。
-
-**产出物 / Deliverables：** 同一套工程下的多端适配说明；在目标设备类型上可安装的 HAP。
-
-**通过标准 / Pass criteria：** 计划支持的设备形态都能安装并跑通已验证的主路径；多端差异有记录，而不是默认同一个包在所有设备上行为完全相同。
-
-Finally, deploy from the same project to multiple device types (for example phone and tablet). Do not start a separate port for each form factor. Re-verify the main path on each intended device, and clean up before publication.
+实现路径已经选定，相应代码或 so 已进入壳工程，并且可以开始做 HAP 级的集成与验证。
 
 ---
 
-## 注意事项 / Notes
+## 第 3 步：集成并对 HAP 做初步验证
 
-- 签名证书、私钥和口令只留在本地，不要提交到仓库。
-- 交叉编译时使用官方工具链与配套 sysroot；遇到异常依赖，先检查是否把 `ohos` 误判成了 Linux。
-- 本流水线可以持续修订，但不要把某一次具体项目的命令历史写进本 Skill。
+**目的**
+
+把上一阶段的实现接到可安装的应用包上，并在真机上证明「能装能跑」。这是后续交互和文件能力的前提。开发期用 `hdc` 推送 so 或做热替换可以加快迭代，但**不能替代**正式的签名安装验证。
+
+**做法**
+
+1. **原生路径：** 通过 NAPI 把 ArkTS 与 so 对接，需要画面或预览的部分用 XComponent 作为原生渲染表面。官方要求中包括：`napi_env` 与 JS 对象不可跨线程使用；耗时逻辑应放到异步任务里，并在完成回调中回到 JS 线程更新结果；一个 so 通常对应一个注册模块，且模块名与库名一致。参见 [Node-API 开发规范](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/napi/napi-guidelines.md) 与 [自定义渲染（XComponent）](https://gitcode.com/openharmony/docs/blob/OpenHarmony-6.0-Release/zh-cn/application-dev/ui/napi-xcomponent-guidelines.md)。
+2. **TypeScript 路径：** 以 ArkUI 渲染界面。若本阶段没有 so，不必为了形式补一条空的 NAPI / XComponent 链路。
+3. 先验证一条最小主路径（启动后能看到核心界面，或原生表面已经出现），不要在这一步展开全部面板。
+4. 使用与目标设备匹配的证书和 Profile 签名，编译 HAP，在目标设备上安装并启动。
+
+**检查项**
+
+- HAP 能安装、能冷启动，并且主路径的初步结果可见。
+- 原生模块加载成功，没有因模块名、ABI 或缺失依赖库而失败。
+- 耗时初始化没有放在 UI 线程上同步执行。
+- 事件处理覆盖完整队列或完整回调序列，而不是只保留「最后一次」通知。轮询间隔过长、准备阶段阻塞界面、多实例或多套数据只处理了第一项、以及底层回传消息被丢弃，都可能表现为界面卡住或长时间空等。
+- 涉及采集、编码或图像质量的阈值，不要为了缩短等待而随意放宽。
+- 大图、多层缓存或较长的撤销栈，要按目标设备内存做上限评估。
+
+**常见失败与处理**
+
+- 能编过但安装失败：回到第 1 步的 `runtimeOS`、API 和签名检查。
+- 能安装但立即退出：查看启动日志，优先检查 native 库加载、NAPI 注册和权限声明。
+- 界面已起来但结果不更新：检查事件是否被覆盖或丢失，以及异步回调是否回到正确线程。
+- 仅在推送 so 后可用、重新签名安装后失败：以签名安装的结果为准，补齐打包配置后再验证。
+
+**进入下一步的标准**
+
+已签名的 HAP 在目标设备上能够安装并启动，主路径的初步结果可见。未达到这一点，不要开始完整的输入对接。
+
+---
+
+## 第 4 步：对接触控、鼠标等输入
+
+**目的**
+
+在应用已经能装能跑之后，再把主路径所需的输入接完整。
+
+**做法**
+
+1. 将点击、滑动、滚轮和指针事件接到 ArkUI 或 XComponent 的输入回调中，并处理系统返回。
+2. 先保证主路径上的单点触控和基本指针操作可用，再考虑多点触控；手写笔和压感作为按需增强，而不是这一步的前置条件。
+3. 输入事件同样要完整处理，不要只取最后一次采样。若通过轮询获取状态，间隔必须足以跟上连续手势。
+4. 在真机上验证前后台切换后，输入仍然可用。
+
+**检查项**
+
+- 主路径可以用触控完成基本操作。
+- 目标形态包含鼠标或指针时，对应操作可用。
+- 手势过程中没有明显丢点、卡死或误触。
+
+**常见失败与处理**
+
+- 鼠标可用但触控无效，或相反：检查事件来源是否只接了一种输入设备。
+- 滑动一段后不再响应：检查是否有事件队列被清空、或原生表面失去焦点。
+
+**进入下一步的标准**
+
+主路径上的基本交互已经可用。输入仍不稳定时，不要开始做保存和目录策略。
+
+---
+
+## 第 5 步：对接保存、选择与目录策略
+
+**目的**
+
+在交互可用之后，再补齐文件的打开、选择和保存，并明确数据放在应用沙箱还是公共目录。
+
+**做法**
+
+1. 默认将应用文件放在应用沙箱中。只有产品确实需要访问用户公共目录时，再申请相应权限，并处理用户拒绝后的路径。
+2. 打开或选择外部文件时，优先使用系统文件选择器，根据用户授权访问所选文件，而不是假设可以遍历整机目录。应用文件访问的官方说明见 [应用文件访问](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/file-management/app-file-access.md)。
+3. 保存、另存为和选择的结果要能回到主路径（例如保存后能再次打开）。
+4. 在说明里写清本阶段支持的文件来源、权限范围和失败时的提示。
+
+**检查项**
+
+- 能完成一次符合策略的选择或保存。
+- 权限不足或用户取消时，有可理解的失败路径，而不会静默崩溃。
+- 没有把调试用的宽权限或设备路径写进仓库。
+
+**常见失败与处理**
+
+- 选择器能打开但无法再次访问：确认是否需要持久化授权，以及 URI 的有效期。
+- 在一台设备上可用、在另一台设备上被拒绝：检查权限模型、设备策略和是否误用了公共目录。
+
+**进入下一步的标准**
+
+主路径在输入和文件访问上已经打通，目录策略已经明确。
+
+---
+
+## 第 6 步：一次开发，多端部署
+
+**目的**
+
+在同一套壳工程和核心实现上，适配手机、平板等不同设备形态，而不是为每个端再做一次独立移植。OpenHarmony 的设计目标包含「一次开发，多端部署」：通过统一的用户程序框架、Ability 框架和 UI 框架，使同一应用在多终端上保持一致性，并支持在开发过程中预览不同终端的能力适配情况。说明见 [OpenHarmony 技术特性](https://docs.openharmony.cn/)。不同设备可裁剪的组件不同，可用 API 也可能不同，需要在目标设备上实测，而不是只看单一机型的结果。
+
+**做法**
+
+1. 核对这些设备的系统类型、API 级别、屏幕规格和输入形态（触控为主，或触控加指针）。
+2. 在同一代码库中用布局、资源和必要的条件编译做适配，避免复制出互不相通的工程。
+3. 在计划支持的每类设备上安装已签名的 HAP，回归启动、交互、保存或选择。
+4. 对外分发或开源前，执行 [checklists/pre-publication.md](../../checklists/pre-publication.md)。
+
+**检查项**
+
+- 计划支持的设备形态都能安装并跑通已验证的主路径。
+- 屏幕规格、输入方式和权限差异已记录，不默认「同一个包在所有设备上行为完全相同」。
+- 仓库中没有密钥、证书、内部路径和设备标识。
+
+**常见失败与处理**
+
+- 只在开发用机上通过：补测计划中的其他形态，尤其是 API 级别或输入方式不同的设备。
+- 平板可用、手机布局不可用：回到自适应布局和断点，而不是再拆一个工程。
+
+**完成标准**
+
+同一工程能够面向计划中的多类设备给出可安装的 HAP，主路径回归通过，并且公开内容已经过清理。
+
+---
+
+## 参考
+
+- [OpenHarmony 开发者文档](https://docs.openharmony.cn/)
+- [应用包签名工具概述](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/security/hapsigntool-overview.md)
+- [NDK 工程构建概述](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/napi/build-with-ndk-overview.md)
+- [Node-API 开发规范](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/napi/napi-guidelines.md)
+- [自定义渲染（XComponent）](https://gitcode.com/openharmony/docs/blob/OpenHarmony-6.0-Release/zh-cn/application-dev/ui/napi-xcomponent-guidelines.md)
+- [应用文件访问](https://gitcode.com/openharmony/docs/blob/master/zh-cn/application-dev/file-management/app-file-access.md)
