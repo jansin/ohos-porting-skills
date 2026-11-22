@@ -1,0 +1,54 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*~
+.idea/
+.vscode/
+*.iml
+
+# Secrets, signing material, and credentials
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+*.csr
+*.jks
+*.keystore
+*.p7b
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+**/local.properties
+**/signing/
+**/material/
+*material*.json
+
+# Device logs and local debug dumps
+*.log
+hilog*
+device-logs/
+*.hprof
+
+# Local build / package outputs (do not publish unsigned or signed artifacts from a personal tree)
+*.hap
+*.app
+*.har
+*.hsp
+dist/
+ohos_config.json.bak
+# Caches, temp files, and unused leftovers
+__pycache__/
+*.pyc
+node_modules/
+.cache/
+*.tmp
+*.bak
+*.orig
+*.rej
+.vs/
+*.user
