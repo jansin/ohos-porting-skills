@@ -1,6 +1,6 @@
 ---
 name: port-to-openharmony
-description: Use this skill when porting or replicating an application onto OpenHarmony. Follow the pipeline in order: reuse or create the HAP shell, choose an open-source or closed-source implementation path, integrate and verify with a signed HAP, then add input, file access, and multi-device deployment.
+description: Use this skill when the user wants to port or replicate an existing application from another platform (such as Android, Linux, Windows, or the Web) onto OpenHarmony. Follow the pipeline in order: collect source and target-device information, reuse or create the HAP shell, choose an open-source or closed-source implementation path, integrate and verify with a signed HAP, then add input, file access, and multi-device deployment.
 ---
 
 # 将应用移植或复刻到 OpenHarmony
@@ -20,7 +20,15 @@ description: Use this skill when porting or replicating an application onto Open
 5. 对接保存、选择，并确定沙箱或公共目录策略。
 6. 在同一工程上完成一次开发、多端部署。
 
-开始前先记下目标设备形态、系统（OpenHarmony 或 HarmonyOS）以及 API 级别。这些假设会直接影响壳工程配置和签名方式。
+开始工作前，先向使用者确认下列信息。缺一项就先问清楚，不要用猜测代替。
+
+## 开始前需要确认的信息
+
+- **源项目：** 开源仓库或源码目录，或用于分析的闭源应用（安装包或可运行程序）。同时确认是否已有可复用的 HAP / DevEco 壳工程。
+- **许可：** 若为开源，许可证是否允许计划中的修改与分发；品牌、图标和名称是否可沿用。
+- **目标设备：** 系统是 OpenHarmony 还是 HarmonyOS、API 级别、设备形态（手机、平板等）和 ABI。这些会决定 `runtimeOS`、SDK 和签名方式。
+- **构建环境：** 与目标匹配的 SDK、DevEco 或等价工具、签名所需的 Java 运行时，以及仅保存在本地的证书和 Profile。
+
 
 ---
 

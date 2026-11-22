@@ -49,7 +49,22 @@ Maintained by [Miaojunxiang (苗俊祥)](https://github.com/jansin). Licensed un
 git clone https://github.com/jansin/ohos-porting-skills.git
 ```
 
-编码助手可将 `skills/port-to-openharmony/` 复制到 skills 目录，或直接引用该 `SKILL.md`。阅读时建议先看本页流程，再按 Skill 逐步执行，并对照 `checklists/`。
+**给编码助手使用**
+
+把 `skills/port-to-openharmony/` 整个目录复制到助手能加载的 skills 位置，目录中必须包含 `SKILL.md`。以 Cursor 为例，可复制到当前项目的 `.cursor/skills/port-to-openharmony/`，或复制到你平时使用的个人 skills 目录。其他同样遵循 `SKILL.md` 约定的助手，也可以用同样方式加载。
+
+如果不方便拷贝，也可以在对话里直接指出本仓库中 `skills/port-to-openharmony/SKILL.md` 的路径，请助手先阅读并按其中顺序执行。
+
+开始移植前，请向助手提供：
+
+- 源码仓库或待分析的闭源应用；
+- 是否开源，以及许可证是否允许计划中的使用；
+- 是否已经有可复用的 HAP / DevEco 壳工程；
+- 目标系统（OpenHarmony 或 HarmonyOS）、API 级别、设备形态和 ABI。
+
+**给人阅读使用**
+
+先读本页的流程概述，再按 `skills/port-to-openharmony/SKILL.md` 逐步执行。公开或分发移植结果前，对照 `checklists/pre-publication.md`。若需要记录一次可公开的判断，可复制 `templates/port-notes.md`。
 
 ### 仓库结构
 
@@ -60,7 +75,7 @@ ohos-porting-skills/
 ├── CONTRIBUTING.md
 ├── skills/port-to-openharmony/      # 通用移植 Skill
 ├── checklists/                      # 公开或分发前的检查清单
-└── templates/                       # 可选记录模板
+└── templates/port-notes.md          # 可选的过程记录模板
 ```
 
 ### 贡献与许可
@@ -115,7 +130,22 @@ Licensing, signing, event completeness, and large-memory limits are built into t
 git clone https://github.com/jansin/ohos-porting-skills.git
 ```
 
-Coding assistants can copy `skills/port-to-openharmony/` into a skills directory, or reference that `SKILL.md` directly. For human readers, start with this overview, then follow the skill and the checklists.
+**With a coding assistant**
+
+Copy the entire `skills/port-to-openharmony/` directory — including `SKILL.md` — to a skills location the assistant can load. In Cursor, that can be `.cursor/skills/port-to-openharmony/` in the current project, or a personal skills directory you already use. Other assistants that understand `SKILL.md` can be set up the same way.
+
+If copying is inconvenient, point the assistant at `skills/port-to-openharmony/SKILL.md` in this repository and ask it to follow the pipeline in order.
+
+Before starting, provide:
+
+- the source repository, or the closed-source app to be analyzed;
+- whether the source is open, and whether the license allows the intended use;
+- whether a reusable HAP / DevEco shell already exists;
+- the target OS (OpenHarmony or HarmonyOS), API level, device form factor, and ABI.
+
+**As a human-readable manual**
+
+Start with this overview, then work through `skills/port-to-openharmony/SKILL.md`. Before you publish or distribute a port, use `checklists/pre-publication.md`. To record a publicly shareable decision, copy `templates/port-notes.md`.
 
 ### Repository layout
 
@@ -126,7 +156,7 @@ ohos-porting-skills/
 ├── CONTRIBUTING.md
 ├── skills/port-to-openharmony/      # General porting skill
 ├── checklists/                      # Pre-publication checklist
-└── templates/                       # Optional note template
+└── templates/port-notes.md          # Optional notes template
 ```
 
 ### Contributing and license

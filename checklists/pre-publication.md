@@ -9,12 +9,12 @@ Use this checklist before you publish a port or a derived repository. It accompa
 - [ ] 已确认上游许可允许你计划中的修改、分发和（如适用）商业使用。
 - [ ] 已保留上游要求的版权、许可和 NOTICE。
 - [ ] 已区分「代码开源」和「品牌资源开源」；若商标、图标、启动图或名义未授权，已更换应用名和图标。
-- [ ] 本仓库或派生文档没有把个人移植宣传成上游或平台的官方产品。
+- [ ] 文档没有把个人移植宣传成上游或平台的官方产品。
 
 - [ ] The upstream license allows the intended modification, distribution, and (if applicable) commercial use.
 - [ ] Required copyright, license, and NOTICE files from upstream have been kept.
 - [ ] "The code is open source" is not confused with "the brand assets are open source". The app name and icons have been changed if the trademark, logos, splash screens, or naming are not licensed.
-- [ ] The repository or derived docs do not present a personal port as an official upstream or platform product.
+- [ ] The documentation does not present a personal port as an official upstream or platform product.
 
 ## 密钥与签名 / Secrets and signing
 
@@ -36,12 +36,14 @@ Use this checklist before you publish a port or a derived repository. It accompa
 - [ ] Device serial numbers, internal host names, private network addresses, and unpublished vendor parameters are absent.
 - [ ] Hilog dumps, tombstones, full log captures, and debug dumps that identify a person or a device are not committed.
 
-## 工程配置 / Project configuration
+## 工程配置与验证 / Project configuration and verification
 
-- [ ] `runtimeOS`、compileSdk 和目标 API 与公开声称的目标设备一致，并在文档中写明假设。
+- [ ] `runtimeOS`、compileSdk 和目标 API 与公开声称的目标设备一致，并在文档中写明假设。HarmonyOS 与 OpenHarmony 的打包配置没有混用。
+- [ ] 已在声称支持的设备形态上，用匹配的签名完成过安装和主路径验证。
 - [ ] 本地覆盖文件（如 `local.properties`、本机 SDK 路径）未被跟踪。
 - [ ] 若仓库包含子模块或大型原生目录，已说明获取方式，而不是把无关的完整工程复制进来。
 
-- [ ] `runtimeOS`, compileSdk, and the target API match the publicly stated target device, and the assumptions are documented.
+- [ ] `runtimeOS`, compileSdk, and the target API match the publicly stated target device, and the assumptions are documented. Packaging settings for HarmonyOS and OpenHarmony have not been mixed.
+- [ ] A signed package has been installed and the main path has been verified on the device types you claim to support.
 - [ ] Local override files (such as `local.properties` or machine-local SDK paths) are not tracked.
 - [ ] If the repository uses submodules or a large native tree, the document explains how to obtain them, instead of copying an unrelated full project into the tree.
